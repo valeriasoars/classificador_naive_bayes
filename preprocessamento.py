@@ -24,7 +24,7 @@ df = dfs['orders'] \
     .merge(dfs['drivers'], how='left', left_on='driver_id', right_on='driver_id')
 
 # Etapa 3: Seleção e limpeza de features : Remove colunas de ID puro, que não carregam informação para classificação e podem atrapalhar o modelo
-drop_ids = ['order_id', 'delivery_order_id', 'payment_order_id', 'driver_id', 'store_id', 'hub_id', 'payment_id']
+drop_ids = ['order_id', 'delivery_order_id', 'payment_order_id', 'driver_id', 'store_id', 'hub_id', 'payment_id', 'channel_id']
 df = df.drop(columns=[col for col in drop_ids if col in df.columns])
 
 # Etapa 4: Tratamento de nulos
@@ -35,15 +35,22 @@ for col in df.select_dtypes('object').columns:
     # Preenche strings/categóricas com "UNKNOWN", para que nada fique nulo e tudo seja codificável.
     df[col] = df[col].fillna('UNKNOWN')
 
-# Etapa 5: Codificação categórica
+# Etapa 5: Codificação - OneHot para nominais com poucas categorias, LabelEncoder para o resto
+onehot_cols = [
+    'channel_type', 'delivery_status', 'driver_modal', 'driver_type',
+    'hub_city', 'hub_state', 'store_segment', 'payment_method', 'payment_status'
+]
+onehot_cols = [c for c in onehot_cols if c in df.columns]  # só aplica se existe no dataframe
+
+# Primeiro One-Hot nas recomendadas
+df = pd.get_dummies(df, columns=onehot_cols)
+
+# Depois LabelEncoder nas categóricas remanescentes
 le_dict = {}
 for col in df.select_dtypes('object').columns:
-    # Para cada coluna categórica (texto), cria um LabelEncoder e converte para números inteiros.
-    #abelEncoder mantém o número de colunas pequeno, já que transforma cada categoria em um único número inteiro.
-    # avaliar a necessidade do onehot em algumas
     le = LabelEncoder()
     df[col] = le.fit_transform(df[col])
-    le_dict[col] = le # Salva para decodificação reversa se precisar
+    le_dict[col] = le
 
 # Etapa 6: Criação do alvo binário
 if 'order_status' in df.columns:
